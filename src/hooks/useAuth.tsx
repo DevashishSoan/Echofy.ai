@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
+  resendConfirmation: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -34,15 +35,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check active sessions and sets the user
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session ? mapUser(session.user) : null);
-      setLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        setUser(session ? mapUser(session.user) : null);
+      } catch (error) {
+        console.error('Error in getSession:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session);
       setUser(session ? mapUser(session.user) : null);
       setLoading(false);
     });
@@ -57,29 +67,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
-      name: supabaseUser.user_metadata.name || '',
+      name: supabaseUser.user_metadata?.name || supabaseUser.user_metadata?.full_name || '',
     };
   };
 
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const { data, error } = await supabase.auth.signInWithPassword({ 
+      email: email.trim(), 
+      password 
+    });
+    
+    if (error) {
+      if (error.message.includes('Email not confirmed')) {
+        throw new Error('Please check your email and click the confirmation link before signing in.');
+      }
+      if (error.message.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
+      }
+      throw new Error(error.message);
+    }
+    
+    if (!data.user) {
+      throw new Error('Login failed. Please try again.');
+    }
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+    
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
       password,
       options: {
-        data: { name },
+        data: { 
+          name: name.trim(),
+          full_name: name.trim()
+        },
       },
     });
-    if (error) throw error;
+    
+    if (error) {
+      if (error.message.includes('User already registered')) {
+        throw new Error('An account with this email already exists. Please sign in instead.');
+      }
+      if (error.message.includes('over_email_send_rate_limit')) {
+        throw new Error('Please wait a moment before trying to sign up again. This helps us prevent spam and keep our service secure.');
+      }
+      throw new Error(error.message);
+    }
+    
+    if (data.user && !data.user.email_confirmed_at) {
+      throw new Error('Please check your email and click the confirmation link to complete your registration.');
+    }
+  };
+
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+    });
+    
+    if (error) {
+      throw new Error(error.message);
+    }
   };
 
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) throw new Error(error.message);
   };
 
   return (
@@ -91,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         loading,
+        resendConfirmation,
       }}
     >
       {children}
