@@ -2,9 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Mic, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const SignUpPage: React.FC = () => {
   const navigate = useNavigate();
+  // Add navigation after successful signup
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        navigate('/signin');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [navigate]);
   const { signup } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
@@ -49,34 +59,39 @@ const SignUpPage: React.FC = () => {
     setError('');
     setSuccess('');
     setLoading(true);
-    
-    // Validate form
+
     if (!formData.name.trim()) {
       setError('Please enter your name.');
       setLoading(false);
       return;
     }
-    
+
     if (!passwordStrength.length || !passwordStrength.hasNumber || !passwordStrength.hasLetter) {
       setError('Password must be at least 6 characters long and contain both letters and numbers.');
       setLoading(false);
       return;
     }
-    
+
     try {
       await signup(formData.email, formData.password, formData.name);
       setSuccess('Account created successfully! Please check your email for a confirmation link.');
-      // Don't navigate immediately, let user confirm email first
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');
-      
-      // Check for rate limit error
       if (err?.message?.includes('over_email_send_rate_limit')) {
         setIsButtonDisabled(true);
         setCountdown(12);
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+    if (error) {
+      setError('Google sign-in failed. Please try again.');
     }
   };
 
@@ -97,11 +112,9 @@ const SignUpPage: React.FC = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {error && (
-            <div className="mb-4 p-4 text-red-700 bg-red-100 rounded-lg">
-              {error}
-            </div>
+            <div className="mb-4 p-4 text-red-700 bg-red-100 rounded-lg">{error}</div>
           )}
-          
+
           {success && (
             <div className="mb-4 p-4 text-green-700 bg-green-100 rounded-lg flex items-start">
               <CheckCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
@@ -115,7 +128,7 @@ const SignUpPage: React.FC = () => {
               </div>
             </div>
           )}
-          
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
@@ -169,28 +182,16 @@ const SignUpPage: React.FC = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                 </button>
               </div>
-              
-              {/* Password strength indicator */}
               {formData.password && (
                 <div className="mt-2 space-y-1">
                   <div className="text-xs text-gray-600">Password requirements:</div>
                   <div className="flex space-x-4 text-xs">
-                    <span className={passwordStrength.length ? 'text-green-600' : 'text-red-600'}>
-                      ✓ At least 6 characters
-                    </span>
-                    <span className={passwordStrength.hasLetter ? 'text-green-600' : 'text-red-600'}>
-                      ✓ Contains letters
-                    </span>
-                    <span className={passwordStrength.hasNumber ? 'text-green-600' : 'text-red-600'}>
-                      ✓ Contains numbers
-                    </span>
+                    <span className={passwordStrength.length ? 'text-green-600' : 'text-red-600'}>✓ At least 6 characters</span>
+                    <span className={passwordStrength.hasLetter ? 'text-green-600' : 'text-red-600'}>✓ Contains letters</span>
+                    <span className={passwordStrength.hasNumber ? 'text-green-600' : 'text-red-600'}>✓ Contains numbers</span>
                   </div>
                 </div>
               )}
@@ -202,7 +203,7 @@ const SignUpPage: React.FC = () => {
                 disabled={isButtonDisabled || loading}
                 className={`w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                   isButtonDisabled || loading
-                    ? 'bg-gray-400 cursor-not-allowed' 
+                    ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                 }`}
               >
@@ -219,7 +220,21 @@ const SignUpPage: React.FC = () => {
               </button>
             </div>
           </form>
-          
+
+          {/* Google Sign-In Button */}
+          <div className="mt-6">
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="h-5 w-5 mr-2"
+              />
+              Continue with Google
+            </button>
+          </div>
 
           <div className="mt-6">
             <div className="relative">

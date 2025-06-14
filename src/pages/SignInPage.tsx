@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase'; // Import Supabase client from lib directory
 import { Mic, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const SignInPage: React.FC = () => {
   const navigate = useNavigate();
   const { login, resendConfirmation } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +18,7 @@ const SignInPage: React.FC = () => {
     setError('');
     setLoading(true);
     setShowResendConfirmation(false);
-    
+
     try {
       await login(formData.email, formData.password);
       navigate('/dashboard');
@@ -42,6 +40,13 @@ const SignInPage: React.FC = () => {
       alert('Confirmation email sent! Please check your inbox.');
     } catch (err: any) {
       setError(err.message || 'Failed to resend confirmation email.');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) {
+      setError('Google sign-in failed: ' + error.message);
     }
   };
 
@@ -76,7 +81,7 @@ const SignInPage: React.FC = () => {
               )}
             </div>
           )}
-          
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -162,15 +167,27 @@ const SignInPage: React.FC = () => {
           </form>
 
           <div className="mt-6">
-            <div className="relative">
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 text-gray-500">
-                  Don't have an account?{' '}
-                  <Link to="/signup" className="font-medium text-blue-500 hover:text-blue-600">
-                    Sign up
-                  </Link>
-                </span>
-              </div>
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="h-5 w-5 mr-2"
+              />
+              Continue with Google
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 text-gray-500">
+                Don't have an account?{' '}
+                <Link to="/signup" className="font-medium text-blue-500 hover:text-blue-600">
+                  Sign up
+                </Link>
+              </span>
             </div>
           </div>
         </div>
