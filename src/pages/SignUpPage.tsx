@@ -219,6 +219,7 @@ const SignUpPage: React.FC = () => {
               </button>
             </div>
           </form>
+          
 
           <div className="mt-6">
             <div className="relative">

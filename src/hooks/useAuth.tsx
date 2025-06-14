@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   loading: boolean;
   resendConfirmation: (email: string) => Promise<void>;
 }
@@ -33,7 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and sets the user
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -50,8 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, session);
       setUser(session ? mapUser(session.user) : null);
       setLoading(false);
@@ -76,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: email.trim(), 
       password 
     });
-    
+
     if (error) {
       if (error.message.includes('Email not confirmed')) {
         throw new Error('Please check your email and click the confirmation link before signing in.');
@@ -86,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       throw new Error(error.message);
     }
-    
+
     if (!data.user) {
       throw new Error('Login failed. Please try again.');
     }
@@ -96,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters long.');
     }
-    
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -107,17 +106,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       },
     });
-    
+
     if (error) {
       if (error.message.includes('User already registered')) {
         throw new Error('An account with this email already exists. Please sign in instead.');
       }
       if (error.message.includes('over_email_send_rate_limit')) {
-        throw new Error('Please wait a moment before trying to sign up again. This helps us prevent spam and keep our service secure.');
+        throw new Error('Please wait a moment before trying to sign up again.');
       }
       throw new Error(error.message);
     }
-    
+
     if (data.user && !data.user.email_confirmed_at) {
       throw new Error('Please check your email and click the confirmation link to complete your registration.');
     }
@@ -128,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       type: 'signup',
       email: email.trim(),
     });
-    
+
     if (error) {
       throw new Error(error.message);
     }
@@ -136,6 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
+  };
+
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
     if (error) throw new Error(error.message);
   };
 
@@ -147,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         signup,
         logout,
+        signInWithGoogle,
         loading,
         resendConfirmation,
       }}
