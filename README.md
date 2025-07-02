@@ -88,7 +88,7 @@ project/
 
 For feedback or collaboration, reach out at:  
 📧 soandevashish@gmail.com  
-🔗 [LinkedIn](https://www.linkedin.com/in/devashishsoan/)
+🔗 [LinkedIn]([https://www.linkedin.com/in/devashishsoan/](https://www.linkedin.com/in/devashish-soan-5b1564339 )
 
 ---
 ✅ Built with Bolt.new
